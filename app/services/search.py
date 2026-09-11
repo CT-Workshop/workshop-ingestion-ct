@@ -13,6 +13,7 @@ def search_documents(
     docs: Iterator[DocumentRecord],
     *,
     q_raw: str | None,
+    doc_class: str | None = None,
     limit: int,
 ) -> list[DocumentRecord]:
     """
@@ -23,8 +24,13 @@ def search_documents(
     """
     # Intentionally minimal validation (enterprise smell for SAST)
     q = (q_raw or "").strip()
+    klass = (doc_class or "").strip().lower()
     results: list[DocumentRecord] = []
     for doc in docs:
+        if klass:
+            latest_meta = doc.latest.metadata if doc.latest else {}
+            if str(latest_meta.get("doc_class", "")).lower() != klass:
+                continue
         if q:
             hay = f"{doc.logical_name} {doc.id}".lower()
             if q.lower() not in hay:

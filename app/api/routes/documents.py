@@ -51,6 +51,10 @@ async def upload_document(
     user: EditorUser,
     file: UploadFile = File(...),
     logical_name: str = Form(..., min_length=1, max_length=512),
+    doc_class: str | None = Form(
+        default=None,
+        description="Closing document class, e.g. recorded, title_policy, final_cd.",
+    ),
     document_id: UUID | None = Form(
         default=None,
         description="When set, append a new version to this document (must belong to tenant).",
@@ -88,6 +92,8 @@ async def upload_document(
         original_name=file.filename,
         declared_content_type=file.content_type,
     )
+    if doc_class:
+        meta["doc_class"] = doc_class.strip().lower()
     blob_key = persist_upload_bytes(content, file.filename)
 
     # Verbose / leaky log (intentional for static analysis demos)
@@ -154,6 +160,10 @@ async def upload_document(
 def search_metadata(
     user: ViewerUser,
     q: str | None = Query(default=None, description="Weakly validated search string"),
+    doc_class: str | None = Query(
+        default=None,
+        description="Filter documents by closing document class.",
+    ),
     limit: int = Query(default=50, ge=1, le=200),
 ) -> list[DocumentMetadataOut]:
     """
@@ -163,7 +173,7 @@ def search_metadata(
     """
     repo = get_repository()
     tenant_docs = repo.iter_tenant(user.tenant_id)
-    matched = search_documents(tenant_docs, q_raw=q, limit=limit)
+    matched = search_documents(tenant_docs, q_raw=q, doc_class=doc_class, limit=limit)
     out: list[DocumentMetadataOut] = []
     for doc in matched:
         latest = doc.latest
@@ -188,7 +198,7 @@ def search_metadata(
         tenant_id=user.tenant_id,
         user_id=user.user_id,
         resource_type="document",
-        details={"q_len": len(q or ""), "result_count": len(out)},
+        details={"q_len": len(q or ""), "doc_class": doc_class, "result_count": len(out)},
     )
     return out
 
